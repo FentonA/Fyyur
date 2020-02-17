@@ -79,9 +79,9 @@ class Artist(db.Model):
 
 class Show(db.Model):
 	id = db.Column(db.Integer, primary_key=True)
-	venue_id = db.Column('artist_id',db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
-	artist_id = db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True)
-	start_time = db.Column(db.DateTime, nullable=False)
+	artist_id = db.Column('artist_id',db.Integer, db.ForeignKey('Artist.id'), primary_key=True),
+	venue_id = db.Column('venue_id', db.Integer, db.ForeignKey('Venue.id'), primary_key=True),
+	start_time = db.Column(db.DateTime)
 #----------------------------------------------------------------------------#
 # Filters.
 #----------------------------------------------------------------------------#
@@ -509,7 +509,7 @@ def create_show_submission():
 				db.session.add(new_show)
 				db.session.commit()
 			except:
-				flash('We are full')
+				flash('Something went wrong, could not register show' + SQLerror)
 		return render_template('pages/home.html')
 
 
