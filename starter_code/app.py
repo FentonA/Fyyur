@@ -45,7 +45,7 @@ class Venue(db.Model):
 		phone = db.Column(db.String(120))
 		wbesite = db.Column(db.String(120))
 		seeking_talent = db.Column(db.Boolean)
-		show = db.relationship('Show', backref='venue', lazy=True)
+		shows_venue = db.relationship('Show', backref='venue', lazy=True)
 		# upcoming_shows
 		# past_shows_count
 		# upcoming_shows_count
@@ -65,7 +65,6 @@ class Artist(db.Model):
 		image_link = db.Column(db.String(500))
 		facebook_link = db.Column(db.String(120))
 		seeking_venue = db.Column(db.Boolean)
-		seeking_description = db.Column(db.String(150))
 		image_link = db.Column(db.String(120))
 		shows = db.Column(db.Integer, db.ForeignKey(Venue.id), nullable=True)
 		show = db.relationship('Show', backref='artist', lazy=True)
@@ -157,7 +156,6 @@ def search_venues():
 @app.route('/venues/<int:venue_id>')
 def show_venue(venue_id):
 
-	data = {}
 	obj = Venue.query.filter_by(id=venue_id).first()
 	data = {
 		'id': obj.id,
@@ -335,7 +333,7 @@ def edit_artist_submission(artist_id):
 		# TODO: take values from the form submitted, and update existing
 		# artist record with ID <artist_id> using the new attributes
 	form = ArtistForm(request.form)
-	artist = Artist.query.get(artist_id)
+	artist = Artist.query.filter(Artist.id == artist_id).one_or_none()
 	if form.validate():
 		try:
 				artist = Artist(
@@ -347,7 +345,6 @@ def edit_artist_submission(artist_id):
 						phone=request.form['phone'],
 						facebook_link=request.form['facebook_link'],
 						image_link= request.form['image_link'],)
-				db.session.add(venue_edit)
 				db.session.commit()
 				flash('Artist ' + request.form['name'] + 'was successfully listed!')
 		except:
@@ -380,12 +377,12 @@ def edit_venue(venue_id):
 		return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 
-@app.route('/venues/<int:venue_id>/edit', methods=['GET','POST'])
+@app.route('/venues/<int:venue_id>/edit', methods=['GET','PATCH'])
 def edit_venue_submission(venue_id):
 		# TODO: take values from the form submitted, and update existing
 		# venue record with ID <venue_id> using the new attributes
 	form = VenueForm(request.form)
-	venue = Venue.query.get(venue_id)
+	venue = Venue.query.filter(Venue.id == venue_id).one_or_none()
 	if form.validate():
 		try:
 				venue = Venue(
@@ -397,7 +394,7 @@ def edit_venue_submission(venue_id):
 						phone=request.form['phone'],
 						facebook_link=request.form['facebook_link'],
 						image_link= request.form['image_link'],)
-				db.session.add(venue_edit)
+				db.session.add(venue)
 				db.session.commit()
 				flash('Venue ' + request.form['name'] + 'was successfully listed!')
 		except SQLAlchemyError as e:
@@ -452,26 +449,15 @@ def shows():
 		# TODO: replace with real venues data.
 		# num_shows should be aggregated based on number of upcoming shows per
 		# venue.
-	data = []
-	shows = Show.query.with_entities(
-	Show.venue_id, 
-	Show.artist_id, 
-	Show.start_time, 
-	Venue.name.label('venue_name'), 
-	Artist.name.label('artist_name'), 
-	Artist.image_link.label('artist_image_link')
-	).join(Venue, Show.venue_id==Venue.id).join(Artist, Show.artist_id==Artist.id).all()
+    data = []
+    shows= db.session.query(Show).join(Artist).join(Venue).all()
+    for show in shows:
+        data.append({
+            "venue_id": shows.venue_id,
+            "artist_id": shows.artist_id,
+        })
 
-	for el in shows:
-		data.append({
-			"venue_id": el.venue_id, 
-			"venue_name": el.venue_name, 
-			"artist_id": el.artist_id, 
-			"artist_name": el.artist_name, 
-			"artist_image_link": el.artist_image_link,
-		})
-
-	return render_template('pages/shows.html', shows=data)
+    return render_template('pages/shows.html', shows=data)
 
 
 @app.route('/shows/create')
@@ -486,15 +472,16 @@ def create_show_submission():
 	form = ShowForm(request.form)
 	error = False
 	try:
-		show = Show(
-			artist_id = request.form[artist_id.data],
-			venue_id = form.venue_id.data,
-			start_time = form.start_time.data
-		)
+		show = Show()
+		show.artist_id = request.form['artist_id']
+		show.venue_id = request.form['venue_id']
+		
 		db.session.add(show)
 		db.session.commit()
-	except:
+
+	except Exception as e:
 		error = True
+		print(f'Error==>{e}')
 		db.session.rollback()
 	finally:
 		db.session.close()
